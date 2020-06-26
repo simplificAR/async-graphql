@@ -41,14 +41,17 @@ pub fn add_container_attrs(
 pub fn parse_derive(input: TokenStream) -> Result<(proc_macro::TokenStream, DeriveInput)> {
     let mut input: DeriveInput = syn::parse2(input)?;
     let attrs = &mut input.attrs;
-    let pos = attrs
+    let graphql_attr = attrs
         .iter()
-        .find_position(|attr| attr.path.is_ident("graphql"))
-        .unwrap()
-        .0;
-    let attribute = attrs.remove(pos);
-    let args = attribute.parse_args::<TokenStream>()?;
-    Ok((args.into(), input))
+        .find_position(|attr| attr.path.is_ident("graphql"));
+
+    if let Some((pos, _attr)) = graphql_attr {
+        let attribute = attrs.remove(pos);
+        let args = attribute.parse_args::<TokenStream>()?;
+        Ok((args.into(), input))
+    } else {
+        Ok((TokenStream::new().into(), input))
+    }
 }
 
 fn parse_nested_validator(
@@ -128,7 +131,7 @@ pub fn parse_validator(crate_name: &TokenStream, args: &MetaList) -> Result<Toke
                     ));
                 }
                 let validator = parse_nested_validator(crate_name, &ls.nested[0])?;
-                return Ok(quote! { Some(std::sync::Arc::new(#validator)) });
+                return Ok(quote! { Some(::std::sync::Arc::new(#validator)) });
             }
         }
     }
@@ -315,7 +318,7 @@ pub fn feature_block(
         quote!({
             #[cfg(not(all(#(feature = #features),*)))]
             {
-                return Err(#crate_name::FieldError::from(#error_message)).map_err(std::convert::Into::into);
+                return Err(#crate_name::FieldError::from(#error_message)).map_err(::std::convert::Into::into);
             }
             #[cfg(all(#(feature = #features),*))]
             {
